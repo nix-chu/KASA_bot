@@ -26,4 +26,4 @@ for filename in os.listdir("./cogs"):
         client.load_extension(f'cogs.{filename[:-3]}') # Remove .py extension
 
 load_dotenv(".env")
-client.run(os.getenv('TOKEN'))
+client.run(os.getenv('DISCORD_TOKEN'))
