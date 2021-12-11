@@ -1,4 +1,5 @@
 from dotenv import load_dotenv
+from discord import Embed
 from discord.ext import commands, tasks
 import tweepy
 import os
@@ -52,22 +53,45 @@ class KASA_bot(commands.Cog):
             )
             user["last_tweet_id"] = tweet[0].id
 
-    @tasks.loop(minutes=1)
+    @tasks.loop(seconds=20)
     async def check_twitter_update(self):
         """Periodically check for twitter updates every minute for every user."""
         for user in self.twitter_accounts:
             tweets = self.twitter_api.user_timeline(
                 screen_name=user["username"],
-                count=10,
+                since_id=user["last_tweet_id"], # Ensure only new tweets are received
                 exclude_replies=True,
                 include_rts=False
             )
+            if len(tweets) > 0:
+                # Iterates through new tweets. Most recent is at the front of list.
+                for i in range(len(tweets) - 1, -1, -1):
+                    tweet = tweets[i]
+                    channel = self.client.get_channel(889045121084063814) # TODO: Add functionality to select channel
 
-            for i in range(len(tweets) - 1, -1, -1):
-                if user["last_tweet_id"] < tweets[i].id:
-                    # There is a new tweet
-                    print(tweets[i].text) # TODO: Create embed for every new tweet and post on channel
-                    user["last_tweet_id"] = tweets[i].id
+                    author_url = "https://twitter.com/" + tweet.user.screen_name
+                    tweet_url = author_url + "/status/" + tweet.id_str
+
+                    package = Embed(
+                        description=tweet.text,
+                        timestamp=tweet.created_at,
+                        color=1942002 # Twitter blue
+                    )
+                    package.set_author(
+                        name=tweet.user.name,
+                        url=author_url,
+                        icon_url=tweet.user.profile_image_url_https
+                    )
+                    package.set_footer(
+                        text="Twitter",
+                        icon_url="https://cdn4.iconfinder.com/data/icons/social-media-icons-the-circle-set/48/twitter_circle-512.png"
+                    )
+                    if "media" in tweet.entities.keys():
+                        # Post preview regardless if video or photo or gif
+                        package.set_image(url=tweet.entities["media"][0]["media_url_https"])
+
+                    await channel.send(content=tweet_url, embed=package)
+                user["last_tweet_id"] = tweets[0].id
 
     @commands.command()
     async def hello(self, ctx):
