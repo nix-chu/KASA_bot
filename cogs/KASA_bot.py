@@ -21,7 +21,7 @@ class KASA_bot(commands.Cog):
         # TODO: Need to connect username with Discord channel
 
         self.queues = {}
-        self.now_playing = None
+        self.now_playing = {}
     
     @commands.Cog.listener()
     async def on_ready(self):
@@ -204,12 +204,16 @@ class KASA_bot(commands.Cog):
     @commands.command()
     async def next(self, ctx):
         """Play the next song in queue."""
+        guild_id = ctx.message.guild.id
+
+        # Reset music player
         voice = ctx.guild.voice_client
         voice.stop()
+        self.now_playing[guild_id] = None
 
-        guild_id = ctx.message.guild.id
+        # Play next song
         if self.queues[guild_id] != []:
-            self.now_playing = self.queues[guild_id].pop(0)
+            self.now_playing[guild_id] = self.queues[guild_id].pop(0)
             voice.play(
                 self.now_playing["song"],
                 after=lambda x = None : asyncio.run(self.next(ctx))
@@ -241,6 +245,7 @@ class KASA_bot(commands.Cog):
         # FIXME: Throws RuntimeError: got Future pending attached to a different loop. When music player stops.
         guild_id = ctx.message.guild.id
         self.queues[guild_id] = []
+        self.now_playing[guild_id] = None
         await ctx.send("Queue cleared.")
 
     @commands.command()
@@ -265,7 +270,12 @@ class KASA_bot(commands.Cog):
     @commands.command()
     async def np(self, ctx):
         """Display current song playing. Also known as 'Now Playing'."""
-        await ctx.send("Now playing: " + self.now_playing["song_title"])
+        guild_id = ctx.message.guild.id
+
+        if self.now_playing[guild_id] is None:
+            pass
+        else:
+            await ctx.send("Now playing: " + self.now_playing[guild_id]["song_title"])
 
     # End of Youtube commands
 
