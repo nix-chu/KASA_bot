@@ -10,6 +10,7 @@ class KASA_bot(commands.Cog):
     def __init__(self, client):
         self.client = client
         self.twitter_api = None
+        self.music_downloader = None
 
         self.twitter_accounts = [
             {
@@ -17,11 +18,14 @@ class KASA_bot(commands.Cog):
             }
         ]
         # TODO: Need to connect username with Discord channel
+
+        self.queues = {}
     
     @commands.Cog.listener()
     async def on_ready(self):
         """Prepare bot functionality on start-up."""
         self.startup_twitter_update()
+        self.startup_music_player()
 
         # Load background tasks
         self.check_twitter_update.start()
@@ -99,19 +103,41 @@ class KASA_bot(commands.Cog):
     # End of Twitter commands
     # Start of Youtube commands
 
-    @commands.command()
+    def startup_music_player(self):
+        """Set-up music player portion of the bot."""
+        YDL_OPTIONS = { "format": "bestaudio" }
+        self.music_downloader = youtube_dl.YoutubeDL(YDL_OPTIONS)
+
     async def join(self, ctx):
         """Join a voice channel."""
         if ctx.author.voice is None:
             # User is not in a voice channel
             await ctx.send("You're not in a voice channel!")
+            return
 
         voice_channel = ctx.author.voice.channel
         if ctx.voice_client is None:
-            # Join voice channel with user if not already connected
-            await voice_channel.connect()
+            # Bot is not connected to any voice channel
+            await ctx.voice_client.connect(voice_channel)
+        elif ctx.voice_client.channel == voice_channel:
+            # Bot is already connected to your voice channel
+            return
         else:
-            # Already in a different voice channel
+            # User and bot are in different voice channels
+            await ctx.voice_client.move_to(voice_channel)
+    
+    @commands.command()
+    async def move(self, ctx):
+        """Move bot to the user's voice channel."""
+        if ctx.author.voice is None:
+            # User is not in a voice channel
+            await ctx.send("You're not in a voice channel!")
+            return
+
+        voice_channel = ctx.author.voice.channel
+        if ctx.voice_client == voice_channel:
+            await ctx.send("Bot is already in your voice channel!")
+        else:
             await ctx.voice_client.move_to(voice_channel)
     
     @commands.command()
@@ -121,24 +147,30 @@ class KASA_bot(commands.Cog):
 
     @commands.command()
     async def play(self, ctx, url): 
-        """Play a song in a voice channel."""
-        ctx.voice_client.stop()
-
-        # Streaming options
+        """Add a song to queue."""
         FFMPEG_OPTIONS = {
-            "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
-            "options": "-vn"
+            'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
+            'options': '-vn'
         }
-        YDL_OPTIONS = { "format": "bestaudio" }
+        self.join()
+
+        # TODO: Check if url is from youtube and reject otherwise
+
+        # Download song info
+        download_info = self.music_downloader.extract_info(url, download=False)
+        download_url = download_info['formats'][0]['url']
+        source = await FFmpegOpusAudio.from_probe(download_url, **FFMPEG_OPTIONS)
         
-        # Stream the song
-        voice_channel = ctx.voice_client
-        with youtube_dl.YoutubeDL(YDL_OPTIONS) as ydl:
-            download_info = ydl.extract_info(url, download=False)
-            download_url = download_info['formats'][0]['url']
-            # Create stream to play the audio
-            source = await FFmpegOpusAudio.from_probe(download_url, **FFMPEG_OPTIONS)
-            voice_channel.play(source)
+        # Add song to server's queue
+        guild_id = ctx.message.guild.id
+        if guild_id in self.queues:
+            self.queues[guild_id].append(source)
+        else:
+            self.queues[guild_id] = [source]
+        
+        # Announce song added to queue
+        song_title = download_info['title']
+        await ctx.send(song_title + "added to queue!")
 
     @commands.command()
     async def pause(self, ctx):
@@ -149,14 +181,14 @@ class KASA_bot(commands.Cog):
     @commands.command()
     async def resume(self, ctx):
         """Resumes the paused song."""
-        await ctx.voice_channel.resume()
+        await ctx.voice_client.resume()
         await ctx.send("Resumed song.")
 
     # End of Youtube commands
 
     @commands.command()
     async def hello(self, ctx):
-        await ctx.send("shut up")
+        await ctx.send("Bot version is 220121.1")
 
 def setup(client):
     """Initialises the class inside the Discord bot."""
