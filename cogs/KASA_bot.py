@@ -1,5 +1,5 @@
 from dotenv import load_dotenv
-from discord import Embed
+from discord import Embed, FFmpegOpusAudio
 from discord.ext import commands, tasks
 import tweepy
 import os
@@ -118,6 +118,39 @@ class KASA_bot(commands.Cog):
     async def disconnect(self, ctx):
         """Disconnect from a voice channel."""
         await ctx.voice_client.disconnect()
+
+    @commands.command()
+    async def play(self, ctx, url): 
+        """Play a song in a voice channel."""
+        ctx.voice_client.stop()
+
+        # Streaming options
+        FFMPEG_OPTIONS = {
+            "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
+            "options": "-vn"
+        }
+        YDL_OPTIONS = { "format": "bestaudio" }
+        
+        # Stream the song
+        voice_channel = ctx.voice_client
+        with youtube_dl.YoutubeDL(YDL_OPTIONS) as ydl:
+            download_info = ydl.extract_info(url, download=False)
+            download_url = download_info['formats'][0]['url']
+            # Create stream to play the audio
+            source = await FFmpegOpusAudio.from_probe(download_url, **FFMPEG_OPTIONS)
+            voice_channel.play(source)
+
+    @commands.command()
+    async def pause(self, ctx):
+        """Pause the current song."""
+        await ctx.voice_client.pause()
+        await ctx.send("Paused song.")
+    
+    @commands.command()
+    async def resume(self, ctx):
+        """Resumes the paused song."""
+        await ctx.voice_channel.resume()
+        await ctx.send("Resumed song.")
 
     # End of Youtube commands
 
