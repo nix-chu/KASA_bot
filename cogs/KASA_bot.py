@@ -159,18 +159,47 @@ class KASA_bot(commands.Cog):
         # Download song info
         download_info = self.music_downloader.extract_info(url, download=False)
         download_url = download_info['formats'][0]['url']
+        song_title = download_info['title']
         source = await FFmpegOpusAudio.from_probe(download_url, **FFMPEG_OPTIONS)
         
         # Add song to server's queue
         guild_id = ctx.message.guild.id
         if guild_id in self.queues:
-            self.queues[guild_id].append(source)
+            self.queues[guild_id].append(
+                {
+                    "song_title": song_title,
+                    "song":source
+                }
+            )
         else:
-            self.queues[guild_id] = [source]
+            self.queues[guild_id] = [
+                {
+                    "song_title": song_title,
+                    "song": source
+                }
+            ]
         
-        # Announce song added to queue
-        song_title = download_info['title']
-        await ctx.send(song_title + "added to queue!")
+        if ctx.voice_client.is_playing():
+            # Announce song added to queue
+            await ctx.send(song_title + " added to queue!")
+        else:
+            # Play song
+            await next(ctx)
+
+
+    @commands.command()
+    async def next(self, ctx):
+        """Play the next song in queue."""
+        voice = ctx.guild.voice_client
+        voice.stop()
+
+        guild_id = ctx.message.guild.id
+        if self.queues[guild_id] != []:
+            song_dict = self.queues[guild_id].pop(0)
+            voice.play(song_dict["song"], after=lambda x = None : self.next(ctx))
+            await ctx.send(song_dict["song_title"] + " now playing!")
+        else:
+            await ctx.send("No songs left in queue.")
 
     @commands.command()
     async def pause(self, ctx):
