@@ -2,3 +2,4 @@ discord==1.7.3
 discord.py==1.7.3
 tweepy==4.4.0
 python-dotenv
+youtube-dl
