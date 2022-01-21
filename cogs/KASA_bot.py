@@ -20,6 +20,7 @@ class KASA_bot(commands.Cog):
         # TODO: Need to connect username with Discord channel
 
         self.queues = {}
+        self.now_playing = None
     
     @commands.Cog.listener()
     async def on_ready(self):
@@ -195,9 +196,12 @@ class KASA_bot(commands.Cog):
 
         guild_id = ctx.message.guild.id
         if self.queues[guild_id] != []:
-            song_dict = self.queues[guild_id].pop(0)
-            voice.play(song_dict["song"], after=lambda x = None : self.next(ctx))
-            await ctx.send(song_dict["song_title"] + " now playing!")
+            self.now_playing = self.queues[guild_id].pop(0)
+            voice.play(
+                self.now_playing["song"],
+                after=lambda x = None : self.next(ctx)
+            )
+            await ctx.send(self.now_playing["song_title"] + " now playing!")
         else:
             await ctx.send("No songs left in queue.")
 
@@ -212,6 +216,34 @@ class KASA_bot(commands.Cog):
         """Resumes the paused song."""
         await ctx.voice_client.resume()
         await ctx.send("Resumed song.")
+    
+    @commands.command()
+    async def stop(self, ctx):
+        """Clear queue and stop playing song."""
+        ctx.guild.voice_client.stop()
+        guild_id = ctx.message.guild.id
+        self.queues[guild_id] = []
+        await ctx.send("Queue cleared.")
+
+    @commands.command()
+    async def queue(self, ctx):
+        """View music queue."""
+        guild_id = ctx.message.guild.id
+        queue = self.queue[guild_id]
+
+        # Create embed text
+        text = "Coming up next:\n"
+        count = 1
+        for item in range(queue):
+            text += "[" + count + "] " + item["song_title"] + "\n"
+            count += 1
+        package = Embed(description=text)
+        await ctx.send(embed=package)
+    
+    @commands.command()
+    async def np(self, ctx):
+        """Display current song playing. Also known as 'Now Playing'."""
+        await ctx.send("Now playing: " + self.now_playing["song_title"])
 
     # End of Youtube commands
 
