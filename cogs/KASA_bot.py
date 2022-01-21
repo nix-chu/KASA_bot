@@ -3,6 +3,7 @@ from discord import Embed
 from discord.ext import commands, tasks
 import tweepy
 import os
+import youtube_dl
 
 class KASA_bot(commands.Cog):
 
@@ -27,6 +28,8 @@ class KASA_bot(commands.Cog):
 
         # Start-up complete message
         print("Bot is online")
+
+    # Start of Twitter commands
 
     def startup_twitter_update(self):
         """Set-up Twitter portion of the bot."""
@@ -92,6 +95,31 @@ class KASA_bot(commands.Cog):
 
                     await channel.send(content=tweet_url, embed=package)
                 user["last_tweet_id"] = tweets[0].id
+
+    # End of Twitter commands
+    # Start of Youtube commands
+
+    @commands.command()
+    async def join(self, ctx):
+        """Join a voice channel."""
+        if ctx.author.voice is None:
+            # User is not in a voice channel
+            await ctx.send("You're not in a voice channel!")
+
+        voice_channel = ctx.author.voice.channel
+        if ctx.voice_client is None:
+            # Join voice channel with user if not already connected
+            await voice_channel.connect()
+        else:
+            # Already in a different voice channel
+            await ctx.voice_client.move_to(voice_channel)
+    
+    @commands.command()
+    async def disconnect(self, ctx):
+        """Disconnect from a voice channel."""
+        await ctx.voice_client.disconnect()
+
+    # End of Youtube commands
 
     @commands.command()
     async def hello(self, ctx):
